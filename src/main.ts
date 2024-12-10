@@ -1,18 +1,23 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import Stats from "stats.js";
 
 import "./style.css";
-import { cameraManager, curveManager, memoryManager, sceneManager } from "./managers";
+import { brainManager, cameraManager, curveManager, memoryManager, sceneManager } from "./managers";
 
 
 let
   renderer: THREE.WebGLRenderer,
   controls: OrbitControls,
   stats,
-  brain: THREE.Object3D,
-  clock: THREE.Clock;
+  clock: THREE.Clock,
+  sensor: number;
+
+// document.addEventListener("click", () => {
+//   const music = document.getElementById("music") as HTMLAudioElement;
+//   if (music) music.play();
+// });
+
 
 init();
 
@@ -24,12 +29,26 @@ function init() {
   button.style.right = "0px";
   button.innerText = "Click this button"
 
-
-
   button.onclick = () => {
     cameraManager.changeMode();
-    const viewPos = memoryManager.getRandomMemory();
-    if (viewPos) cameraManager.update(viewPos)
+  };
+
+  // test slider
+  const sliderInput = document.createElement("input");
+  sliderInput.type = "range";
+  sliderInput.min = "0";
+  sliderInput.max = "1";
+  sliderInput.step = "0.01";
+  sliderInput.value = "0"; // 초기값 설정
+  sliderInput.style.zIndex = "999";
+  sliderInput.style.position = "absolute";
+  sliderInput.style.right = "0px";
+  sliderInput.style.top = "50px"; // 버튼 아래 위치
+  document.body.appendChild(sliderInput);
+
+  // 슬라이더 값 변경 이벤트 핸들러
+  sliderInput.oninput = () => {
+    sensor = parseFloat(sliderInput.value); // 전역 변수 slider에 값 저장
   };
 
 
@@ -42,7 +61,7 @@ function init() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 디바이스 픽셀 비율 설정
   document.body.appendChild(renderer.domElement);
 
-  // OrbitControls
+  OrbitControls
   controls = new OrbitControls(cameraManager.getCamera(), renderer.domElement);
   controls.enableDamping = true; // Smooth controls
   controls.dampingFactor = 0.25;
@@ -65,38 +84,8 @@ function init() {
   //   }
   // );
 
-  // GLTF Model Loader
-  const loader = new GLTFLoader();
-  loader.load(
-    "/brain.glb", // Replace with the actual path to your GLTF file
-    (gltf) => {
-      brain = gltf.scene;
 
-      // Wireframe Material
-      brain.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.material = new THREE.MeshBasicMaterial({
-            wireframe: true,
-          });
-          child.visible = false;
-        }
-      });
-
-      sceneManager.add(brain);
-      setInterval(() => {
-        brain.traverse((child) => {
-          if (child instanceof THREE.Mesh) {
-            curveManager.createCurve(child);
-            memoryManager.createMemory(child);
-          }
-        });
-      }, 3000); // Generate every 500ms
-    },
-    undefined,
-    (error) => {
-      console.error("An error occurred while loading the model:", error);
-    }
-  );
+  brainManager.init();
 
   // Resize Handling
   window.addEventListener("resize", onWindowResize);
@@ -114,11 +103,11 @@ function animate() {
   requestAnimationFrame(animate);
   // sensorlog();
 
-  cameraManager.update();
+  // cameraManager.update();
 
   // Update 
-  curveManager.update(clock);
-  memoryManager.update(clock);
+  curveManager.update(clock, sensor);
+  memoryManager.update(clock, sensor);
   controls.update();
 
   renderer.render(sceneManager.getScene(), cameraManager.getCamera())

@@ -7,6 +7,8 @@ export const getRandom = (min: number, max: number, int: boolean) => {
 
 export const lerpEase = (start: THREE.Vector3, end: THREE.Vector3, t: number): THREE.Vector3 => {
   const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1);
+  const easeQuad = (t: number) => t * t * t
+
   // start + (end - start) * ease;
   return end.clone().add(start.clone().multiplyScalar(-1)).multiplyScalar(ease(t)).add(start.clone());
 }
