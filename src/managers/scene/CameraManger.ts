@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { lerpEase } from "../../utils";
 import { ViewPos } from "../../type";
+import { memoryManager } from "..";
 
 
 export default class CameraManager {
@@ -16,7 +17,7 @@ export default class CameraManager {
   private isZoom: boolean = false;
   private zoomViewPos: ViewPos | null = null;
   private mode: "rotate" | "zoomIn" | "zoomOut" = "rotate";
-  private zoomDuration: number = 1;
+  private zoomDuration: number = 3;
 
   constructor() {
     if (CameraManager.instance) return CameraManager.instance;
@@ -38,10 +39,20 @@ export default class CameraManager {
     else this.mode = "zoomOut";
   }
 
-  update = (viewPos?: ViewPos) => {
-    if (viewPos && this.mode === "zoomIn") this.zoomIn(viewPos);
+  update = () => {
+    if (this.mode === "zoomIn") this.zoomIn();
     else if (this.mode === "zoomOut") this.zoomOut();
     else this.rotate();
+  }
+
+  getLookAt() {
+    const direction = new THREE.Vector3();
+    this.camera.getWorldDirection(direction);
+
+    const cameraPosition = new THREE.Vector3();
+    this.camera.getWorldPosition(cameraPosition);
+
+    return cameraPosition.clone().add(direction);
   }
 
   zoomOut = () => {
@@ -49,6 +60,7 @@ export default class CameraManager {
     this.isZoom = true;
 
     const initialPos = this.camera.position.clone();
+    const initialLookAt = this.getLookAt();
     const targetPos = new THREE.Vector3(this.rotateRadius * Math.sin(this.rotateAngle), initialPos.y, this.rotateRadius * Math.cos(this.rotateAngle));
     let loopId: number;
     let progress = 0;
@@ -59,35 +71,43 @@ export default class CameraManager {
       if (progress < 1) {
         progress += zoomSpeed;
         this.camera.position.copy(lerpEase(initialPos, targetPos, progress));
-        this.camera.lookAt(0, 0, 0);
+        this.camera.lookAt(lerpEase(initialLookAt, new THREE.Vector3(0, 0, 0), progress));
 
         loopId = requestAnimationFrame(zoomLoop);
       } else {
         this.isZoom = false;
+        this.zoomViewPos = null;
         this.mode = "rotate";
         cancelAnimationFrame(loopId);
+        memoryManager.updateZoom(false); // alert zoom out
       }
     }
     zoomLoop();
   }
 
-  zoomIn = (viewPos: ViewPos) => {
+  zoomIn = () => {
     if (this.isZoom) return; // while zooming no more call
+    if (!memoryManager.isMemories()) return; // when there is no memories yet
+
     this.isZoom = true;
-    this.zoomViewPos = viewPos;
+    if (!this.zoomViewPos) {
+      this.zoomViewPos = memoryManager.getActivateMemory();
+      memoryManager.updateZoom(true); // alert zoom state
+    }
 
     const initialPos = this.camera.position.clone();
+    const initialLookAt = this.getLookAt();
     let loopId: number;
     let progress = 0;
 
     // start zoom loop
-    const zoomSpeed = 1 / (60 * this.zoomDuration); // 60fps 기준
+    const zoomSpeed = 1 / (60 * this.zoomDuration);
     const zoomLoop = () => {
       // console.log("zoomLoop", viewPos);
-      if (progress < 1) {
+      if (progress < 1 && this.zoomViewPos) {
         progress += zoomSpeed;
-        this.camera.position.copy(lerpEase(initialPos, viewPos.position, progress));
-        this.camera.lookAt(viewPos.lookAt);
+        this.camera.position.copy(lerpEase(initialPos, this.zoomViewPos.position, progress));
+        this.camera.lookAt(lerpEase(initialLookAt, this.zoomViewPos.lookAt, progress));
 
         loopId = requestAnimationFrame(zoomLoop);
       } else {
@@ -99,12 +119,10 @@ export default class CameraManager {
   }
 
   rotate() {
-    // 카메라의 x, z 좌표를 업데이트하여 원을 그리도록 설정
-    this.rotateAngle += 0.001; // 각도 증가 속도
+    this.rotateAngle += 0.001;
     this.camera.position.x = this.rotateRadius * Math.sin(this.rotateAngle);
     this.camera.position.z = this.rotateRadius * Math.cos(this.rotateAngle);
 
-    // 카메라가 항상 중심을 바라보도록 설정
     this.camera.lookAt(0, 0, 0);
   }
 

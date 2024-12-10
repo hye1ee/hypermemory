@@ -1,29 +1,38 @@
 import * as THREE from "three";
 import { getRandom } from "../../utils";
-import fragmentShader from '../../shaders/fragment.glsl';
-import vertexShader from '../..//shaders/vertex.glsl';
+import fragmentShader from '../../shaders/curve_frag.glsl';
+import vertexShader from '../../shaders/curve_vtx.glsl';
+import particlesVertexShader from "../../shaders/particles_vtx.glsl"
+import particlesFragmentShader from "../../shaders/particles_frag.glsl"
 
 export class Curve {
   status: "grow" | "live" | "shrink" | "dead";
   mesh: THREE.Mesh;
+  particles: THREE.Object3D;
   private length: number;
 
   private life: number;
   private draw: number;
+  private material: THREE.ShaderMaterial | null = null;
+  private particlesMaterial: THREE.ShaderMaterial | null = null;
 
   constructor(points: THREE.Vector3[]) {
     this.status = "grow"
-    this.mesh = this.init(points);
-    this.length = this.mesh.geometry.drawRange.count;
 
-    this.life = getRandom(3, 10, false) * 1000; //milli seconds
+    const data = this.init(points);
+    this.mesh = data.mesh;
+    this.particles = data.particles;
+
+    this.length = this.mesh.geometry.drawRange.count;
+    // this.life = getRandom(3, 10, false) * 1000; //milli seconds
+    this.life = 999999999999999
     this.draw = 0;
     this.mesh.geometry.setDrawRange(0, this.draw);
   }
 
-  init(points: THREE.Vector3[]) {
+  init(points: THREE.Vector3[]): { mesh: THREE.Mesh, particles: THREE.Points } {
     const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeometry = new THREE.TubeGeometry(curve, 64, 1, 8, false);
+    const tubeGeometry = new THREE.TubeGeometry(curve, 128, 1, 10, true);
 
     // Vertex Colors
     const vertexColors = new Float32Array(
@@ -33,19 +42,65 @@ export class Curve {
       "color",
       new THREE.BufferAttribute(vertexColors, 3)
     );
-    tubeGeometry.setDrawRange(0, tubeGeometry.attributes.position.count);
+    // tubeGeometry.setDrawRange(0, tubeGeometry.attributes.position.count * 3);
 
     // const material = new THREE.MeshStandardMaterial({
     //   vertexColors: true,
     // });
 
-    const material = new THREE.ShaderMaterial({
+    this.material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
+      transparent: true,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uSensor1: { value: 0 },
+        uSeed: { value: Math.random() }
+      },
     });
-    return new THREE.Mesh(tubeGeometry, material);
+    const mesh = new THREE.Mesh(tubeGeometry, this.material);
+
+
+    const particlesGeometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(500));
+    this.particlesMaterial = new THREE.ShaderMaterial({
+      vertexShader: particlesVertexShader,
+      fragmentShader: particlesFragmentShader,
+      transparent: true,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uSensor1: { value: 0 },
+        uSeed: { value: Math.random() },
+        uDuration: { value: 100 },
+        uLength: { value: 501 },
+        uNeighbor: { value: 5 },
+      },
+    });
+    // add index attributes
+    const indices = new Float32Array(particlesGeometry.attributes.position.count);
+    for (let i = 0; i < 50; i++) {
+      indices[i] = i; // 각 정점의 인덱스
+    }
+    particlesGeometry.setAttribute(
+      'index',
+      new THREE.BufferAttribute(indices, 1)
+    );
+    const particles = new THREE.Points(particlesGeometry, this.particlesMaterial);
+
+    return { mesh, particles };
   }
 
+  updateUniformVar = (label: string, value: number) => {
+    if (this.material) this.material.uniforms[label].value = value;
+    if (this.particlesMaterial) this.particlesMaterial.uniforms[label].value = value;
+  }
   updateColor(time: number): void {
     if (!this.mesh) return;
 

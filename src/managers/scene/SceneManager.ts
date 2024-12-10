@@ -36,25 +36,25 @@ export default class SceneManager {
 
     this.scene.remove(object);
 
-    if (object.parent) {
+    if (object.parent && object.parent !== this.scene) {
       object.parent.remove(object);
     }
 
     object.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
+        // Geometry 정리
+        if (child.geometry) child.geometry.dispose();
+
+        // Material 정리
         if (Array.isArray(child.material)) {
           child.material.forEach((material) => {
             if (material.map) material.map.dispose(); // Texture 정리
-            material.dispose();
+            if (material.dispose) material.dispose();
           });
         } else {
           if (child.material.map) child.material.map.dispose(); // Texture 정리
-          child.material.dispose();
+          if (child.material.dispose) child.material.dispose();
         }
-      } else { // if nested group
-        this.remove(child);
-        return;
       }
     });
     return;
