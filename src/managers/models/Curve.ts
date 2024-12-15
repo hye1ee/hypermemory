@@ -9,6 +9,7 @@ export class Curve {
   status: "grow" | "live" | "shrink" | "dead";
   mesh: THREE.Mesh;
   particles: THREE.Object3D;
+
   private length: number;
 
   private life: number;
@@ -23,16 +24,14 @@ export class Curve {
     this.mesh = data.mesh;
     this.particles = data.particles;
 
-    this.length = this.mesh.geometry.drawRange.count;
-    // this.life = getRandom(3, 10, false) * 1000; //milli seconds
-    this.life = 999999999999999
+    this.length = this.mesh.geometry.index?.count ?? Infinity;
+    this.life = getRandom(3, 10, false) * 1000; //milli seconds
     this.draw = 0;
-    this.mesh.geometry.setDrawRange(0, this.draw);
   }
 
   init(points: THREE.Vector3[]): { mesh: THREE.Mesh, particles: THREE.Points } {
     const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeometry = new THREE.TubeGeometry(curve, 128, 1, 10, true);
+    const tubeGeometry = new THREE.TubeGeometry(curve, 128, 0.3, 10, true);
 
     // Vertex Colors
     const vertexColors = new Float32Array(
@@ -58,8 +57,11 @@ export class Curve {
       depthWrite: false,
       uniforms: {
         uTime: { value: 0.0 },
-        uSensor1: { value: 0 },
-        uSeed: { value: Math.random() }
+        uSensor1: { value: 0.0 },
+        uSeed: { value: Math.random() },
+        uMemory: { value: false },
+        uColor1: { value: 1 },
+        uColor2: { value: 1 },
       },
     });
     const mesh = new THREE.Mesh(tubeGeometry, this.material);
@@ -76,16 +78,19 @@ export class Curve {
       depthWrite: false,
       uniforms: {
         uTime: { value: 0.0 },
-        uSensor1: { value: 0 },
+        uSensor1: { value: 0.0 },
         uSeed: { value: Math.random() },
         uDuration: { value: 100 },
-        uLength: { value: 501 },
-        uNeighbor: { value: 5 },
+        uLength: { value: 500 },
+        uNeighbor: { value: 10 },
+        uMemory: { value: false },
+        uColor1: { value: 1 },
+        uColor2: { value: 1 },
       },
     });
     // add index attributes
     const indices = new Float32Array(particlesGeometry.attributes.position.count);
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 500; i++) {
       indices[i] = i; // 각 정점의 인덱스
     }
     particlesGeometry.setAttribute(
@@ -97,7 +102,7 @@ export class Curve {
     return { mesh, particles };
   }
 
-  updateUniformVar = (label: string, value: number) => {
+  updateUniformVar = (label: string, value: number | boolean | THREE.Vector3) => {
     if (this.material) this.material.uniforms[label].value = value;
     if (this.particlesMaterial) this.particlesMaterial.uniforms[label].value = value;
   }
