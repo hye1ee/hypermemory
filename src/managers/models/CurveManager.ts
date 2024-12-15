@@ -1,17 +1,23 @@
 import * as THREE from "three";
 import { Curve } from "./Curve"; // Curve 클래스가 별도 파일로 존재한다고 가정
 import { getRandom } from "../../utils";
+import { SerialData } from "../../type";
+import { brainManager, stateManager } from "..";
 
 
 
 export default class CurveManager {
   static instance: CurveManager | null = null;
   private curves: Curve[] = [];
-  private MIN_CURVE_LENGTH: number = 5;
-  private MAX_CURVE_LENGTH: number = 10;
+  private MIN_CURVE_LENGTH: number = 4;
+  private MAX_CURVE_LENGTH: number = 8;
 
   private add: ((object: THREE.Object3D) => void) | null = null;
   private remove: ((object: THREE.Object3D) => void) | null = null;
+
+  private isEnded: boolean = false;
+  private uColor1: number = 1;
+  private uColor2: number = 1;
 
   constructor(add: (object: THREE.Object3D) => void, remove: (object: THREE.Object3D) => void) {
     if (CurveManager.instance) return CurveManager.instance;
@@ -22,9 +28,37 @@ export default class CurveManager {
     CurveManager.instance = this;
   }
 
+  init() {
+    this.uColor1 = Math.floor(Math.random() * 3) + 1;
+    this.uColor2 = Math.floor(Math.random() * 2) + 1;
+
+    this.isEnded = false;
+    this.createMemoryWithRandomDelay();
+  }
+
+  createMemoryWithRandomDelay() {
+    if (this.isEnded) return; // end loop
+    const randomDelay = Math.floor(Math.random() * 2); // 3 ~ 6초 사이
+
+    const parent = brainManager.getBrainChild();
+    if (parent) this.createCurve(parent);
+
+    setTimeout(() => {
+      this.createMemoryWithRandomDelay();
+    }, randomDelay * 1000);
+  }
+
   createMeshCurve(mesh: THREE.Mesh): void {
 
     if (!this.add || !this.remove) return;
+
+    if (this.curves.length > 15) {
+      const firstItem = this.curves[0];
+      this.remove(firstItem.mesh);
+      this.remove(firstItem.particles);
+
+      this.curves.shift();
+    }
 
     // get points from brain mesh
     const vertices = mesh.geometry.attributes.position.array as Float32Array;
@@ -108,14 +142,17 @@ export default class CurveManager {
   }
 
   // 모든 곡선 업데이트
-  update(clock: THREE.Clock, sensor: number): void {
+  update(clock: THREE.Clock, sensor: SerialData): void {
     const delta = clock.getDelta() * 1000;
     const time = clock.getElapsedTime() * 1000;
 
     this.curves.forEach((curve, index) => {
       // curve.updateColor(time);
       curve.updateUniformVar("uTime", time);
-      curve.updateUniformVar("uSensor1", sensor);
+      curve.updateUniformVar("uSensor1", sensor[1]);
+      curve.updateUniformVar("uColor1", this.uColor1);
+      curve.updateUniformVar("uColor2", this.uColor2);
+      curve.updateUniformVar("uMemory", stateManager.getState() === "memory");
 
       if (curve.status === "grow") {
         curve.grow(delta);
@@ -131,6 +168,17 @@ export default class CurveManager {
         this.curves.splice(index, 1);
       }
     });
+  }
+
+  end = () => {
+    this.isEnded = true;
+    this.curves.forEach((curve) => {
+      if (this.remove) {
+        this.remove(curve.mesh);
+        this.remove(curve.particles);
+      }
+    })
+    this.curves = [];
   }
 }
 
