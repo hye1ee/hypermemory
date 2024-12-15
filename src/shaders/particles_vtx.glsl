@@ -14,6 +14,7 @@ uniform float uNeighbor;
 
 void main() {
     // send to frag shader
+    vUv = uv;
     float activeIndex = mod(floor(uTime / uDuration), float(uLength + 1.));
     float dist = abs(index - activeIndex);
 
