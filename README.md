@@ -56,8 +56,9 @@ Depending on the user’s position and the varying sensor values, the system alt
 
 ### Implementation
 
-![GITHUB](https://img.shields.io/badge/Typescript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![GITHUB](https://img.shields.io/badge/Threejs-000000?style=for-the-badge&logo=Three.js&logoColor=white)
+![Typescript](https://img.shields.io/badge/Typescript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Three.js](https://img.shields.io/badge/Threejs-000000?style=for-the-badge&logo=Three.js&logoColor=white)
+![GLSL](https://img.shields.io/badge/GLSL-555555?style=for-the-badge&logo=&logoColor=gray)
 
 The main system is implemented on the web using Three.js. For better performance, most of the visual effects were written in GLSL code, 6 different shaders that run on the GPU for 3D scene rendering. The system receives sensor inputs through a serial connection via a physical wire.
 
